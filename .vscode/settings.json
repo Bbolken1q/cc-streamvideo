@@ -1,0 +1,18 @@
+{
+    "Lua.diagnostics.globals": [
+        "colors",
+        "paintutils",
+        "term",
+        "monitor",
+        "peripheral",
+        "http",
+        "frameBuffer",
+        "parallel",
+        "yield"
+    ],
+    "Lua.diagnostics.disable": [
+        "unused-local",
+        "unused-function",
+        "undefined-field"
+    ]
+}
