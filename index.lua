@@ -162,10 +162,16 @@ local function setFrame(string)
     displayLines(framedata[3])                      -- actual frame data
 end
 
+local ws
+
 local function connectToWS()
-    local ws = assert(http.websocket("127.0.0.1:3000"))
+    ws = assert(http.websocket("127.0.0.1:3000"))
     Frametime = ws.receive()
     print("running animation @ " .. Frametime .. "fps")
+    Framecount = ws.receive()
+    print(Framecount)
+    Framecount = tonumber(Framecount)
+    print(Framecount)
     os.queueEvent("player_start")
     while true do
         local response = ws.receive()
@@ -174,28 +180,45 @@ local function connectToWS()
             print("websocket closed")
             break
         else
+            local frames = separateByCharacter(response, "#")
             print("Pushing frame into framebuffer")
-            FrameBuffer.push(response)
+            for i=1, #frames do
+                FrameBuffer.push(frames[i])
+            end
+            
             
             -- print(FrameBuffer.pop())
             -- setFrame(FrameBuffer.pop())
         end
+        coroutine.yield()
     end
 end
 
 local function pushFrame()
     os.pullEvent("player_start") --wait for the player to start 
     local time = os.epoch("utc")
-    while not (FrameBuffer.first > FrameBuffer.last) do 
-        while(time+(1000/Frametime) < os.epoch("utc")) do
-            print("Frametime: "..os.epoch("utc")-time)
-            setFrame(FrameBuffer.pop())
-            time = os.epoch("utc")
-            os.sleep(0)                                 -- to avoid yielding ¯\_(ツ)_/¯
+    local framec = 0
+    while true do
+        print("Started mainloop --------------------------------------")
+        if not (FrameBuffer.first > FrameBuffer.last) and Framecount >= framec then 
+            while (not (FrameBuffer.first > FrameBuffer.last)) do
+                while(time+(1000/Frametime) < os.epoch("utc")) do
+                    print("Frametime: "..os.epoch("utc")-time)
+                    setFrame(FrameBuffer.pop())
+                    time = os.epoch("utc")
+                    framec = framec + 1;
+                end
+                coroutine.yield()
+            end
+        else
+            -- coroutine.yield()
+            break
         end
     end
     -- print(FrameBuffer.pop())
     print("No more frames to display")
+    exit()
+
 end
 
 term.clear()
