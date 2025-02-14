@@ -1,1 +1,6 @@
 /target
+/linear
+/old
+*.jpg
+*.png
+/src/*.jpg
