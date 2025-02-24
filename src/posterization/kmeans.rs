@@ -8,27 +8,22 @@ use image::{DynamicImage, RgbImage};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kmeans_colors::get_kmeans;
 use palette::rgb::Rgb;
+
 #[allow(unused_imports)]
 use crate::qpixel::qpixel::Qpixel;
 
 mod sorting;
 #[allow(unused_imports)]
-use sorting::{lightness, hue};
+use sorting::{lightness_linear, lightness_unweighted, lightness, hue, hilbert_wrapper, hilbert_lookup};
 
 #[path="../sort.rs"]
 mod sort;
 use sort::merge_sort;
 
-pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> Vec<u8> {  //pixels: &Vec<Rgb>
+pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> (Vec<Rgb>, Vec<Qpixel>) {  //pixels: &Vec<Rgb>
     /*
         Base implementation, ~230ms for clustering and posterization 
     */
-
-    // black_box(findDistance::FindDistance(black_box([0,0,0]), black_box([255,225,255])));
-
-
-
-    // return Vec::new();
 
     let img = image;
 
@@ -70,13 +65,15 @@ pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> 
         seed
     );
 
+    let sorting = &hilbert_lookup;
+
     let centroids = result.centroids;
     // println!("{}", centroids.len());
     // let indices = result.indices;
 
-    let mut posterized_pixels:Vec<u8> = Vec::with_capacity(rgb_image.len());
+    let mut posterized_pixels:Vec<Rgb> = Vec::with_capacity(rgb_image.len()/3);
 
-    let sorted_centroids = merge_sort(&quantize_colors(&centroids, &lightness));
+    let sorted_centroids = merge_sort(&quantize_colors(&centroids, sorting));
 
     let mut hues:Vec<f32> = Vec::with_capacity(k+1);
 
@@ -122,17 +119,23 @@ pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> 
         // let nearest = kdtree.nearest_one::<HueSorting>(&[query.hue; 1]);
         // let nearestsqe = NearestDistanceSquaredEuclidean(QPixel{color: Rgb::new(pixel[0] as f32, pixel[1] as f32, pixel[2] as f32), hue: hue(&mut [pixel[0] as f32, pixel[1] as f32, pixel[2] as f32])}, &sorted_centroids);hue(&mut [pixel[0] as f32, pixel[1] as f32, pixel[2] as f32])
         // println!("{}, rgb: {:?}", nearest, sc[nearest as usize]);
-        let nearestbts = get_position(&hues, lightness(&Rgb::new(pixel[0] as f32, pixel[1] as f32, pixel[2] as f32)));
+        let nearestbts = get_position(&hues, sorting(&Rgb::new(pixel[0] as f32, pixel[1] as f32, pixel[2] as f32)));
 
         // println!("{}, {}", nearest.item.to_string().truecolor(sorted_centroids[nearest.item as usize].color.red as u8, sorted_centroids[nearest.item as usize].color.green as u8, sorted_centroids[nearest.item as usize].color.blue as u8), nearestbts.to_string().truecolor(sorted_centroids[nearestbts as usize].color.red as u8, sorted_centroids[nearestbts as usize].color.green as u8, sorted_centroids[nearestbts as usize].color.blue as u8));
 
         // println!("{}", nearest_t)
 
         let rgbvalue = sorted_centroids[nearestbts as usize];
-        posterized_pixels.push(rgbvalue.color.red as u8);
-        posterized_pixels.push(rgbvalue.color.green as u8);
-        posterized_pixels.push(rgbvalue.color.blue as u8);
+        // posterized_pixels.push(rgbvalue.color.red as u8);
+        // posterized_pixels.push(rgbvalue.color.green as u8);
+        // posterized_pixels.push(rgbvalue.color.blue as u8);
+
+        posterized_pixels.push(rgbvalue.color);
+
+        // returns array of width 960 and height 180
+
+        // to get 1d position from x (w) and y (h) use x + y * 320 * 3
     }
 
-    return posterized_pixels
+    return (posterized_pixels, sorted_centroids)
 }

@@ -4,7 +4,8 @@ pub mod qpixel {
     #[derive(Clone, Copy, Debug)]
     pub struct Qpixel { 
         pub color: Rgb,
-        pub hue: f32
+        pub hue: f32,
+        pub index: u32
     }
 
     impl PartialEq for Qpixel {
@@ -18,8 +19,8 @@ pub mod qpixel {
     }
 
     impl Qpixel {
-        pub fn new(pixel: Rgb, fun: &dyn Fn(&Rgb) -> f32 ) -> Qpixel {
-            return Qpixel { color: pixel, hue: fun(&pixel)}
+        pub fn new(_pixel: Rgb, _fun: &dyn Fn(&Rgb) -> f32, _index: Option<u32> ) -> Qpixel {
+            return Qpixel { color: _pixel, hue: _fun(&_pixel), index: _index.unwrap_or_default() }
         }
     }
 }

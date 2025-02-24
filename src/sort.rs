@@ -1,6 +1,5 @@
 use crate::qpixel::qpixel::Qpixel;
 
-
 /*
     Sort three values of type T (fast)
 */

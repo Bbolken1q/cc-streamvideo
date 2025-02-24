@@ -218,12 +218,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "colored",
+ "colors-transform",
  "fast_image_resize",
  "futures-util",
  "image 0.25.5",
  "kiddo",
  "kmeans",
  "kmeans_colors",
+ "lazy_static",
  "palette",
  "rand 0.9.0",
  "tokio",
@@ -278,6 +280,12 @@ checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
  "windows-sys",
 ]
+
+[[package]]
+name = "colors-transform"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9226dbc05df4fb986f48d730b001532580883c4c06c5d1c213f4b34c1c157178"
 
 [[package]]
 name = "cpufeatures"

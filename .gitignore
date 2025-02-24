@@ -1,6 +1,11 @@
 /target
 /linear
 /old
+/hilbert
+/input
+/output
+/broken-lines
 *.jpg
 *.png
-/src/*.jpg
+*.cp
+*.txt

@@ -47,12 +47,13 @@ pub fn nearest_distance_squared_euclidean(point: Qpixel, centroids: &Vec<Qpixel>
     return smallest_iter;
 }
 
+#[allow(dead_code)]
 pub fn quantize_colors(centroids: &Vec<Rgb>, fun: &dyn Fn(&Rgb) -> f32) -> Vec<Qpixel> {
     let mut qpixels: Vec<Qpixel> = Vec::with_capacity(centroids.len());
 
     for color in centroids {
         // qpixels.push(QPixel::new(*color));
-        qpixels.push(Qpixel::new(*color, fun))
+        qpixels.push(Qpixel::new(*color, fun, None))
     }
 
     return qpixels;
