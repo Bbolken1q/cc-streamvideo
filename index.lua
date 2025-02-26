@@ -73,7 +73,7 @@ local newColor = {
 
 
 FrameBuffer = {}
-              --this is a bad implementation but it should do (3 hours of footage @ 60fps is only ~650,000 frames, @ 128bytes/frame its only ~8MB of ram)
+              --this is a bad implementation but it should do (3 hours of footage @ 60fps is only ~650,000 frames, @ 128bytes/frame its only ~8MB of ram) // this calculation has proven to be wildly incorrect, without any compression it's 154kb
 
 function FrameBuffer.new()
     return {first = 0, last = -1}
@@ -147,11 +147,11 @@ local function displayLines(string)
     local t = separateByCharacter(string, "-")              -- separate lines from one another
     local iter = 1
     for i=1, #t do                                          -- set up line iterator(keep track of lines)
-        local params = separateByCharacter(t[i], "&")
-        for j=1, tonumber(params[1]) do                     -- print out entire line
-            displayLine(params[2], iter)
-            iter = iter + 1                                 -- advance iterator to next line
-        end
+        local params = separateByCharacter(t[i], "|")
+        local pos = separateByCharacter(params[1], ",")
+        local character = separateByCharacter(params[2], ",")
+
+        drawPixel(character[1], tonumber(pos[2]), tonumber(pos[1]), tonumber(character[2]), tonumber(character[3]))
     end
 end
 
