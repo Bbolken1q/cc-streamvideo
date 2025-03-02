@@ -3,9 +3,9 @@
 /old
 /hilbert
 /input
-/output
+/output*
 /broken-lines
 *.jpg
 *.png
-*.cp
+*.ccp
 *.txt

@@ -1,6 +1,6 @@
 [package]
 name = "ccplayer"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
@@ -19,6 +19,10 @@ kiddo = "5.0.3"
 colored = "3.0.0"
 lazy_static = "1.5.0"
 colors-transform = "0.2.11"
+ffmpeg-next = "7.1.0"
+m3u8-rs = "6.0.0"
+nom = "8.0.0"
+reqwest = "0.12.12"
 
 [profile.release]
 lto = true

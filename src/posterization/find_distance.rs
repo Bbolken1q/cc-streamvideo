@@ -84,8 +84,8 @@ where
 }
 
 fn get_closest(vec: &Vec<f32>, index: &usize, hue: &f32) -> usize {
-    if *index == 15 {
-        return 14;
+    if *index == vec.len() {
+        return vec.len() - 1;
     }
     if *index == 0 {
         return 0;

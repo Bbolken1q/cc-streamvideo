@@ -64,9 +64,10 @@ pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelG
     let mut output_string: String = "1=".to_string();
     for color in &centroids {
         output_string += "0x";
-        output_string += remove_first(&col_rgb::from(color.color.red, color.color.red, color.color.red).to_css_hex_string());
+        output_string += remove_first(&col_rgb::from(color.color.red, color.color.green, color.color.blue).to_css_hex_string());
         output_string += "|";
     }
+    
     output_string += "=";
     for i in 0..(pixels.len()/6) {
         let mut  group: PixelGroup = PixelGroup::new([
@@ -80,15 +81,15 @@ pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelG
         posterize_group(&mut group, &centroids);
         
         // output_string += &("-1&1*".to_owned() + group.character.as_str() + "," + group.c1.to_string().as_str() + "," + group.c2.to_string().as_str());
-        
+
         groups.push(group); 
     }
 
     for x in 0..60 {
-        output_string += "-";
+        output_string += "";
         for j in 0..160 {
-            output_string += &("|1&1*".to_owned() + groups[x*160 + j].character.as_str() + "," + groups[x*160+j].c1.to_string().as_str() + "," + groups[x*160+j].c2.to_string().as_str());
-        } 
+            output_string += &("-".to_owned() + &x.to_string() + "," + &j.to_string() + "|" + groups[x*160 + j].character.as_str() + "," + groups[x*160+j].c1.to_string().as_str() + "," + groups[x*160+j].c2.to_string().as_str());
+        }
     }
 
     return (groups, output_string);
@@ -96,6 +97,7 @@ pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelG
 
 fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
     let group_sorted = merge_sort(&group.pixels);
+    let mask = 0b00111111;
 
     for i in 0..6 {
         let mut hues:Vec<f32> = Vec::with_capacity(centroids.len());
@@ -103,7 +105,7 @@ fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
             hues.push(color.hue);
         }
         group.c1 =  get_position(&hues, group_sorted[0].hue);
-        group.c2 =  get_position(&hues, group_sorted[0].hue);
+        group.c2 =  get_position(&hues, group_sorted[5].hue);
 
         if (group.pixels[i].hue - group_sorted[0].hue).abs() <= (group.pixels[i].hue - group_sorted[5].hue).abs() {
             group.pixels[i] = group_sorted[0];
@@ -115,14 +117,14 @@ fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
             group.structure = group.structure << 1
         }
     }
-
     match CHARSET.get(&group.structure) {
         Some(char) => {
             group.character = char.to_string();
             // println!("{}, {:08b}", char, group.structure);
         }
         None => {
-            match CHARSET.get(&!group.structure) {
+            let structure: u8 = !group.structure;
+            match CHARSET.get(&(structure & mask)) {
                 Some(char) => {
                     group.character = char.to_string();
                     let buf = group.c1;
@@ -130,7 +132,9 @@ fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
                     group.c2 = buf;
                     // println!("{}, {:08b}", char, group.structure);
                 }
-                None => {}
+                None => {
+                    println!("Not found character");
+                }
             }
         }
     }

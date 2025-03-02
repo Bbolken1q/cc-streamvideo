@@ -1,10 +1,14 @@
-use image::ImageReader;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
-use std::{env, fs::File, io::Write};
+use std::env;
+use std::collections::VecDeque;
+
+#[path ="./video/playlist.rs"]
+mod playlist;
+use playlist::return_playlist;
 
 #[path ="./posterization/sorting.rs"]
 mod sorting;
@@ -16,16 +20,21 @@ mod qpixel;
 
 mod p_image;
 
-const E_TIME: &str = "Witamy z powrotem, towarzyszu Stalin";
-
-use std::time::{SystemTime, UNIX_EPOCH};
-
 static mut HILBERT_VALUES: Vec<Vec<Vec<u32>>> = Vec::new();
+
+static mut FRAMES: VecDeque<String> = VecDeque::new();
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    ffmpeg_next::init().unwrap();
+
     let args: Vec<String> = env::args().collect();
-    let _debug = &args[0]; //enable debug
+    if args.len() == 1 {
+        println!("You have not passed an url");
+        std::process::exit(0);
+    }
+    let base_url: &str = &args[1]; //enable debug
+    // println!("playing video from {}", base_url);
 
     let addr = "127.0.0.1:3000".to_string();
     #[allow(unused_variables)]
@@ -38,30 +47,11 @@ async fn main() -> Result<()> {
     //     tokio::spawn(handle_connection(stream));
     // }
 
-    let input_path = [
-        "./input/input_image_shinji.jpg",
-        "./input/input_image_lake.jpg",
-        "./input/input_image_cyberpunk.jpg",
-        "./input/input_image_l4d2.jpg",
-        "./input/input_image_ff.jpg",
-        "./input/input_image_witcher.jpg",
-    ]; // Path to your image
+    let client = reqwest::Client::new();
 
-    let k = 15; // Number of colors for posterization (higher k gives more colors)
+    let _playlist = return_playlist(client, base_url).await;
 
-    for i in 0..1 {
-        let mut file = File::create("foo.txt")?;
-        let img = ImageReader::open(input_path[i]).unwrap().decode().unwrap();
-        
-        let start = SystemTime::now().duration_since(UNIX_EPOCH).expect(E_TIME);
-        let (output_image, ostring) = p_image::posterize_image(&img, k); //.expect("Failed to open image")
-
-        println!("Image sent in {:?}ms", SystemTime::now().duration_since(UNIX_EPOCH).expect(E_TIME).as_millis() - start.as_millis());
-
-        output_image.save("./output/posterized_image".to_string()+&i.to_string()+".png").expect("Failed to save the image");
-        file.write_all(ostring.as_bytes())?;
-    }
-    
+    // let _ = get_frames("./input/test.ts");
 
     Ok(())
 }
