@@ -3,7 +3,7 @@ use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
-use std::env;
+use std::{env, thread};
 use std::collections::VecDeque;
 
 #[path ="./video/playlist.rs"]
@@ -42,10 +42,12 @@ async fn main() -> Result<()> {
     println!("WebSocket server started on ws://{}", addr);
 
     fill_lookup(); // create the lookup table 
+    thread::spawn(move || async move {
+        while let Ok((stream, _)) = listener.accept().await {
+            tokio::spawn(handle_connection(stream));
+        }
+    });
     
-    // while let Ok((stream, _)) = listener.accept().await {
-    //     tokio::spawn(handle_connection(stream));
-    // }
 
     let client = reqwest::Client::new();
 
@@ -62,12 +64,8 @@ async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
     println!("CC client connected");
     ws_stream.send(Message::Text(24.to_string())).await?;
 
-    ws_stream.send(Message::Text("1=0xFFFFFF|0x5BCFFB|0xF5ABB9=12&159*0x80,2,2-12&159*0x80,3,3-12&159*0x80,1,1-12&159*0x80,3,3-12&159*0x80,2,2".to_string())).await?;
-    ws_stream.send(Message::Text("1=0xFFFFFF|0x5BCFFB|0xF5ABB9=12&159*0x80,2,2-12&159*0x80,2,2-12&159*0x80,3,3-12&159*0x80,1,1-12&159*0x80,3,3".to_string())).await?;
-    ws_stream.send(Message::Text("1=0xFFFFFF|0x5BCFFB|0xF5ABB9=12&159*0x80,3,3-12&159*0x80,2,2-12&159*0x80,2,2-12&159*0x80,3,3-12&159*0x80,1,1".to_string())).await?;
-    ws_stream.send(Message::Text("1=0xFFFFFF|0x5BCFFB|0xF5ABB9=12&159*0x80,1,1-12&159*0x80,3,3-12&159*0x80,2,2-12&159*0x80,2,2-12&159*0x80,3,3".to_string())).await?;
-    ws_stream.send(Message::Text("1=0xFFFFFF|0x5BCFFB|0xF5ABB9=12&159*0x80,3,3-12&159*0x80,1,1-12&159*0x80,3,3-12&159*0x80,2,2-12&159*0x80,2,2".to_string())).await?;
-    
+    #[allow(static_mut_refs)]
+    ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap() })).await?;
     ws_stream.send(Message::Text("eof".to_string())).await?;
 
     while let Some(msg) = ws_stream.next().await {

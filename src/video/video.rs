@@ -4,7 +4,7 @@ use ffmpeg::{format::{input, Pixel, context::{Input, destructor::*}}, media::Typ
 use image::{DynamicImage, RgbImage};
 use std::process::Command;
 
-use crate::p_image;
+use crate::{p_image, FRAMES};
 
 struct AVIOBuffer <'a> {
     cursor: Cursor<&'a [u8]>,
@@ -19,6 +19,7 @@ impl AVIOBuffer<'_> {
         let slice;
 
         if buf != ptr::null_mut() {
+            println!("{:?}", buf);
             slice = std::slice::from_raw_parts_mut(buf, buf_size as usize);
         }
         else {
@@ -33,31 +34,9 @@ impl AVIOBuffer<'_> {
     }
 }
 
-// fn create_input(file: &[u8]) -> Result<Input, Error> {
-//     unsafe {
-
-//         let avio_buffer = av_malloc(8192) as *mut u8;
-
-//         if avio_buffer.is_null() {
-//             return Err(Error::InvalidData);
-//         }
-
-//         let ctxt: *mut AVIOContext = avio_alloc_context(avio_buffer, 8192, 0, &mut avio_buffer_struct as *mut _ as *mut std::ffi::c_void, Some(AVIOBuffer::read_packet), None, None);
-//         let mut ps = avformat_alloc_context();
-
-//         (*ps).pb = ctxt;
-//         (*ps).flags = AVFMT_FLAG_CUSTOM_IO;
-
-//         return Ok(Input::wrap(ps)); 
-
-//         // avformat_close_input(&mut ps);
-//         // av_free(ctxt as *mut std::ffi::c_void);
-//     }
-// }
-
 fn create_input(file: &[u8]) -> Result<Input, Error> {
     unsafe {
-        let buf_sz: i32 = 8192;
+        let buf_sz: i32 = 10 * 1024 * 1024;
         let buf = av_malloc(buf_sz as usize) as *mut u8;
 
         let mut avio_buffer_struct = AVIOBuffer {
@@ -65,7 +44,6 @@ fn create_input(file: &[u8]) -> Result<Input, Error> {
         };
 
         let avio_context = avio_alloc_context(buf, buf_sz, 0, &mut avio_buffer_struct as *mut _ as *mut std::ffi::c_void, Some(AVIOBuffer::read_packet), None, None);
-
         let mut context = avformat_alloc_context();
 
         (*context).pb = avio_context;
@@ -99,7 +77,11 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
         let image = DynamicImage::ImageRgb8(RgbImage::from_raw(rgb_frame.width(), rgb_frame.height(), rgb_frame.data(0).to_vec()).ok_or("Failed to create image").expect("Failed to create image"));
         // let _ = image.save("./frame".to_owned() + &frame_index.to_string().to_owned() + ".png");
         (output_image, ostring) = p_image::posterize_image(&image, 15);
-        output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
+        // output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
+        
+        #[allow(static_mut_refs)]
+        unsafe { FRAMES.push_back(ostring.clone()) };
+        
         *frame_index += 1;
         println!("{}", frame_index)
         
@@ -111,11 +93,11 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
 pub fn get_frames(file: &[u8]) -> Result<(), ffmpeg::Error> {
 
     let mut buf: Vec<u8> = Vec::new();
-    let mut f = File::open("./input/test.ts").unwrap();
+    let mut f = File::open("./input/seg58.ts").unwrap();
 
     let _ = f.read_to_end(&mut buf);
 
-    if let Ok(mut ictx) = input("./input/test.ts") { // create_input(&buf)
+    if let Ok(mut ictx) = create_input(&buf) { //  // input("./input/seg58.ts")
         let input = ictx
             .streams()
             .best(Type::Video)
@@ -138,37 +120,18 @@ pub fn get_frames(file: &[u8]) -> Result<(), ffmpeg::Error> {
 
         let mut frame_index = 0;
 
-        let mut receive_and_process_decoded_frames =
-            |decoder: &mut ffmpeg::decoder::Video| -> Result<(), ffmpeg::Error> {
-                let mut decoded = Video::empty();
-                while decoder.receive_frame(&mut decoded).is_ok() {
-                    let mut rgb_frame = Video::empty();
-                    scaler.run(&decoded, &mut rgb_frame)?;
-                    // save_file(&rgb_frame, frame_index).unwrap();
-
-                    let image = DynamicImage::ImageRgb8(RgbImage::from_raw(rgb_frame.width(), rgb_frame.height(), rgb_frame.data(0).to_vec()).ok_or("Failed to create image").expect("Failed to create image"));
-                    // let _ = image.save("./frame".to_owned() + &frame_index.to_string().to_owned() + ".png");
-                    let (_output_image, ostring) = p_image::posterize_image(&image, 15);
-                    // _output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
-                    println!("{}", frame_index);
-                    frame_index += 1;
-                }
-                Ok(())
-            };
-
-
         // println!("{:?}", ictx.packets());
         for (stream, packet) in ictx.packets() {
 
-            if stream.index() == 0 {
+            if stream.index() == video_stream_index {
                 // println!("{:?}", packet.data());
             // {
                 decoder.send_packet(&packet)?;
-                receive_and_process_decoded_frames(&mut decoder)?;
+                receive_and_process_decoded_frames(&mut decoder, &mut frame_index, &mut scaler)?;
             }
         }
         decoder.send_eof()?;
-        receive_and_process_decoded_frames(&mut decoder)?;
+        receive_and_process_decoded_frames(&mut decoder, &mut frame_index, &mut scaler)?;
     }
 
     Ok(())

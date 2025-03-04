@@ -1,7 +1,7 @@
 use fast_image_resize::{images::Image, IntoImageView, ResizeAlg, ResizeOptions, Resizer};
 mod find_distance;
 #[allow(unused_imports)]
-use find_distance::{quantize_colors, get_position, HueSorting};
+use find_distance::{quantize_colors, get_position};
 
 use image::{DynamicImage, RgbImage};
 #[allow(unused_imports)]

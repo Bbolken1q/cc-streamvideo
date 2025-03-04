@@ -1,4 +1,3 @@
-use kiddo::{float::kdtree::Axis, traits::DistanceMetric};
 use palette::rgb::Rgb;
 use std::primitive::u8;
 
@@ -59,7 +58,7 @@ pub fn quantize_colors(centroids: &Vec<Rgb>, fun: &dyn Fn(&Rgb) -> f32) -> Vec<Q
     return qpixels;
 }
 
-#[allow(dead_code)]
+/* #[allow(dead_code)]
 pub struct HueSorting {}
 
 impl<A: Axis, const K: usize> DistanceMetric<A, K> for HueSorting
@@ -81,7 +80,7 @@ where
         (a - b) * (a - b)
         // (a-b).abs()
     }
-}
+} */
 
 fn get_closest(vec: &Vec<f32>, index: &usize, hue: &f32) -> usize {
     if *index == vec.len() {

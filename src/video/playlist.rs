@@ -39,6 +39,8 @@ pub async fn return_playlist(client: reqwest::Client, url: &str) {
             let binding = get_file(&client, &link).await;
             let mut file = binding.as_bytes();
             
+            
+
             let _ = get_frames(&file);
         }
         // let mut file = std::fs::File::open("./input/".to_owned() + &var.uri.to_string()).unwrap();
