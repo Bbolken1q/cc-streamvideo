@@ -1,10 +1,12 @@
 extern crate ffmpeg_next as ffmpeg;
-use std::{ffi::{c_char, CString}, fmt::Debug, fs::File, io::{Cursor, Read}, ptr, result::Result::Ok, str::FromStr, u8};
+use std::{ffi::{c_char, CString}, fmt::Debug, fs::File, io::{Cursor, Read}, path, ptr, result::Result::Ok, str::FromStr, u8};
 use ffmpeg::{format::{input, Pixel, context::{Input, destructor::*}}, media::Type, software::scaling::{context::Context, flag::Flags}, util::{frame::video::Video, error::Error}, ffi::*};
 use image::{DynamicImage, RgbImage};
 use std::process::Command;
 
 use crate::{p_image, FRAMES};
+
+use crate::frame::frame::Frame;
 
 struct AVIOBuffer <'a> {
     cursor: Cursor<&'a [u8]>,
@@ -77,10 +79,12 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
         let image = DynamicImage::ImageRgb8(RgbImage::from_raw(rgb_frame.width(), rgb_frame.height(), rgb_frame.data(0).to_vec()).ok_or("Failed to create image").expect("Failed to create image"));
         // let _ = image.save("./frame".to_owned() + &frame_index.to_string().to_owned() + ".png");
         (output_image, ostring) = p_image::posterize_image(&image, 15);
-        // output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
+        output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
         
+        let frame: Frame = Frame::new(&ostring);
+
         #[allow(static_mut_refs)]
-        unsafe { FRAMES.push_back(ostring.clone()) };
+        unsafe { FRAMES.push_back(frame) };
         
         *frame_index += 1;
         println!("{}", frame_index)
@@ -90,14 +94,9 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
 }
 
 
-pub fn get_frames(file: &[u8]) -> Result<(), ffmpeg::Error> {
+pub fn get_frames(file: &[u8], frame_index: &mut usize) -> Result<(), ffmpeg::Error> {
 
-    let mut buf: Vec<u8> = Vec::new();
-    let mut f = File::open("./input/seg58.ts").unwrap();
-
-    let _ = f.read_to_end(&mut buf);
-
-    if let Ok(mut ictx) = create_input(&buf) { //  // input("./input/seg58.ts")
+    if let Ok(mut ictx) = create_input(file) {
         let input = ictx
             .streams()
             .best(Type::Video)
@@ -118,8 +117,6 @@ pub fn get_frames(file: &[u8]) -> Result<(), ffmpeg::Error> {
             Flags::BILINEAR,
         )?;
 
-        let mut frame_index = 0;
-
         // println!("{:?}", ictx.packets());
         for (stream, packet) in ictx.packets() {
 
@@ -127,11 +124,11 @@ pub fn get_frames(file: &[u8]) -> Result<(), ffmpeg::Error> {
                 // println!("{:?}", packet.data());
             // {
                 decoder.send_packet(&packet)?;
-                receive_and_process_decoded_frames(&mut decoder, &mut frame_index, &mut scaler)?;
+                receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?;
             }
         }
         decoder.send_eof()?;
-        receive_and_process_decoded_frames(&mut decoder, &mut frame_index, &mut scaler)?;
+        receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?;
     }
 
     Ok(())

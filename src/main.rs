@@ -16,13 +16,16 @@ pub mod pixelgroup;
 #[allow(unused_imports)]
 use sorting::{lightness_linear, lightness_unweighted, lightness, hue, hilbert_wrapper, hilbert_lookup, fill_lookup};
 
+mod frame;
+use frame::frame::Frame;
+
 mod qpixel; 
 
 mod p_image;
 
 static mut HILBERT_VALUES: Vec<Vec<Vec<u32>>> = Vec::new();
 
-static mut FRAMES: VecDeque<String> = VecDeque::new();
+static mut FRAMES: VecDeque<Frame> = VecDeque::new();
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,11 +45,11 @@ async fn main() -> Result<()> {
     println!("WebSocket server started on ws://{}", addr);
 
     fill_lookup(); // create the lookup table 
-    thread::spawn(move || async move {
-        while let Ok((stream, _)) = listener.accept().await {
-            tokio::spawn(handle_connection(stream));
-        }
-    });
+    // thread::spawn(move || async move {
+    //     while let Ok((stream, _)) = listener.accept().await {
+    //         tokio::spawn(handle_connection(stream));
+    //     }
+    // });
     
 
     let client = reqwest::Client::new();
@@ -65,7 +68,7 @@ async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
     ws_stream.send(Message::Text(24.to_string())).await?;
 
     #[allow(static_mut_refs)]
-    ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap() })).await?;
+    ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap().get_video() })).await?;
     ws_stream.send(Message::Text("eof".to_string())).await?;
 
     while let Some(msg) = ws_stream.next().await {
