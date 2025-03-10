@@ -2,7 +2,7 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use anyhow::Result;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::SinkExt;
 use std::{env, thread};
 use std::collections::VecDeque;
 use itertools::Itertools;
