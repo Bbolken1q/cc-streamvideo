@@ -22,6 +22,7 @@ ffmpeg-next = "7.1.0"
 m3u8-rs = "6.0.0"
 nom = "8.0.0"
 reqwest = "0.12.12"
+itertools = "0.14.0"
 
 [profile.release]
 lto = true

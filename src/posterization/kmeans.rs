@@ -18,7 +18,7 @@ use sorting::{lightness_linear, lightness_unweighted, lightness, hue, hilbert_wr
 
 #[path="../sort.rs"]
 mod sort;
-use sort::merge_sort;
+use sort::{merge_sort, get_hue, to_ref_vec, from_ref_vec};
 
 pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> (Vec<Rgb>, Vec<Qpixel>) {  //pixels: &Vec<Rgb>
     /*
@@ -73,7 +73,8 @@ pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> 
 
     let mut posterized_pixels:Vec<Rgb> = Vec::with_capacity(rgb_image.len()/3);
 
-    let sorted_centroids = merge_sort(&quantize_colors(&centroids, sorting));
+    let binding = quantize_colors(&centroids, sorting);
+    let sorted_centroids = merge_sort(&to_ref_vec(&binding), &get_hue);
 
     let mut hues:Vec<f32> = Vec::with_capacity(k+1);
 
@@ -137,5 +138,5 @@ pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> 
         // to get 1d position from x (w) and y (h) use x + y * 320 * 3
     }
 
-    return (posterized_pixels, sorted_centroids)
+    (posterized_pixels, from_ref_vec(sorted_centroids))
 }

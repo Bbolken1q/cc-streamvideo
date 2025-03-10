@@ -1,6 +1,6 @@
 #[path ="../sort.rs"]
 mod sort;
-use sort::merge_sort;
+use sort::{merge_sort, get_hue, to_ref_vec};
 
 use std::{collections::HashMap, sync::LazyLock};
 use palette::rgb::Rgb;
@@ -96,7 +96,11 @@ pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelG
 }
 
 fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
-    let group_sorted = merge_sort(&group.pixels);
+    let pixels = group.pixels.clone();
+    let group_sorted: Vec<&Qpixel> = {
+        merge_sort(&to_ref_vec(&pixels), &get_hue)
+    };
+    
     let mask = 0b00111111;
 
     for i in 0..6 {
@@ -108,15 +112,16 @@ fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
         group.c2 =  get_position(&hues, group_sorted[5].hue);
 
         if (group.pixels[i].hue - group_sorted[0].hue).abs() <= (group.pixels[i].hue - group_sorted[5].hue).abs() {
-            group.pixels[i] = group_sorted[0];
+            group.pixels[i] = group_sorted[0].clone();
             group.structure = group.structure << 1;
             group.structure += 1;
 
         } else {
-            group.pixels[i] = group_sorted[5];
+            group.pixels[i] = group_sorted[5].clone();
             group.structure = group.structure << 1
         }
     }
+    
     match CHARSET.get(&group.structure) {
         Some(char) => {
             group.character = char.to_string();
@@ -138,8 +143,6 @@ fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
             }
         }
     }
-
-    // println!("{:06b}", group.structure);
 }
 
 pub fn get_u8_pixels(_pixels: Vec<PixelGroup>) -> Vec<u8> {

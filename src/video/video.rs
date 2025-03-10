@@ -1,18 +1,19 @@
 extern crate ffmpeg_next as ffmpeg;
-use std::{ffi::{c_char, CString}, fmt::Debug, fs::File, io::{Cursor, Read}, path, ptr, result::Result::Ok, str::FromStr, u8};
-use ffmpeg::{format::{input, Pixel, context::{Input, destructor::*}}, media::Type, software::scaling::{context::Context, flag::Flags}, util::{frame::video::Video, error::Error}, ffi::*};
+use std::{ffi::CString, io::{Cursor, Read}, ptr, result::Result::Ok, str::FromStr};
+use ffmpeg::{format::{Pixel, context::Input}, media::Type, software::scaling::{context::Context, flag::Flags}, util::{frame::video::Video, error::Error}, ffi::*};
 use image::{DynamicImage, RgbImage};
-use std::process::Command;
 
 use crate::{p_image, FRAMES};
 
 use crate::frame::frame::Frame;
 
+#[allow(dead_code)]
 struct AVIOBuffer <'a> {
     cursor: Cursor<&'a [u8]>,
 }
 
 impl AVIOBuffer<'_> {
+    #[allow(dead_code)]
     unsafe extern "C" fn read_packet(opaque: *mut std::ffi::c_void, buf: *mut u8, buf_size: i32) -> i32 {
         let buffer = &mut *(opaque as *mut AVIOBuffer);
         
@@ -36,6 +37,7 @@ impl AVIOBuffer<'_> {
     }
 }
 
+#[allow(dead_code)]
 fn create_input(file: &[u8]) -> Result<Input, Error> {
     unsafe {
         let buf_sz: i32 = 10 * 1024 * 1024;
@@ -67,6 +69,7 @@ fn create_input(file: &[u8]) -> Result<Input, Error> {
     }
 }
 
+#[allow(dead_code)]
 fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, frame_index: &mut usize, scaler: &mut Context) -> Result<(DynamicImage, String), ffmpeg::Error> {
     let mut decoded = Video::empty();
     let mut output_image: DynamicImage = DynamicImage::new(0, 0, image::ColorType::Rgb8);
@@ -93,17 +96,23 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
     Ok((output_image, ostring))
 }
 
+#[allow(dead_code)]
+pub fn get_frames(file: &[u8], frame_index: &mut usize) -> Result<Vec<(DynamicImage, String)>, ffmpeg::Error> {
 
-pub fn get_frames(file: &[u8], frame_index: &mut usize) -> Result<(), ffmpeg::Error> {
+    let mut images: Vec<(DynamicImage, String)> = Vec::new();
 
     if let Ok(mut ictx) = create_input(file) {
-        let input = ictx
-            .streams()
+        let stream_index = ictx
+            .streams();
+        let input_audio = stream_index
+            .best(Type::Audio)
+            .ok_or(ffmpeg::Error::StreamNotFound)?;
+        let input_video = stream_index
             .best(Type::Video)
             .ok_or(ffmpeg::Error::StreamNotFound)?;
-        let video_stream_index = input.index();
+        let video_stream_index = input_video.index();
 
-        let context_decoder = ffmpeg::codec::context::Context::from_parameters(input.parameters())?;
+        let context_decoder = ffmpeg::codec::context::Context::from_parameters(input_video.parameters())?;
         let mut decoder = context_decoder.decoder().video()?;
         // let mut decoder = input.codec().decoder().video()?;
 
@@ -124,13 +133,13 @@ pub fn get_frames(file: &[u8], frame_index: &mut usize) -> Result<(), ffmpeg::Er
                 // println!("{:?}", packet.data());
             // {
                 decoder.send_packet(&packet)?;
-                receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?;
+                images.push(receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?);
             }
         }
         decoder.send_eof()?;
-        receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?;
+        images.push(receive_and_process_decoded_frames(&mut decoder, frame_index, &mut scaler)?);
     }
 
-    Ok(())
+    Ok(images)
 }
 

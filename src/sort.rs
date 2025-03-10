@@ -26,25 +26,25 @@ pub fn sort3<'a, T>(mut x: &'a mut T, mut y: &'a mut T, mut z: &'a mut T) -> [&'
 }
 
 #[allow(dead_code)]
-pub fn merge_sort(vec: &Vec<Qpixel>) -> Vec<Qpixel> {
+pub fn merge_sort<'a, T>(vec: &'a Vec<T>, get_value: &dyn Fn(&T) -> f32) -> Vec<T> where T: Copy {
     if vec.len() < 2 {
         return vec.to_vec();
     } else { 
         let size = vec.len() / 2;
-        let left = merge_sort(&vec[0..size].to_vec());
-        let right = merge_sort(&vec[size..].to_vec());
+        let left = merge_sort(&vec[0..size].to_vec(), get_value);
+        let right = merge_sort(&vec[size..].to_vec(), get_value);
 
-        return merge(&left, &right);
+        return merge(left, right, &get_value);
     }
 }
 
-fn merge(left: &Vec<Qpixel>, right: &Vec<Qpixel>) -> Vec<Qpixel> {
+fn merge<'a, T>(left: Vec<T>, right: Vec<T>, get_value: &dyn Fn(&T) -> f32) -> Vec<T> where T: Copy {
     let mut i = 0;
     let mut j = 0;
-    let mut merged: Vec<Qpixel> = Vec::new();
+    let mut merged: Vec<T> = Vec::new();
 
     while i < left.len() && j < right.len() {
-        if left[i].hue < right[j].hue {
+        if get_value(&left[i]) < get_value(&right[j]) {
             merged.push(left[i]);
             i = i + 1;
         } else {
@@ -68,4 +68,19 @@ fn merge(left: &Vec<Qpixel>, right: &Vec<Qpixel>) -> Vec<Qpixel> {
     }
 
     merged
+}
+
+#[allow(dead_code)]
+pub fn get_hue(value: &&Qpixel) -> f32 {
+    return value.hue;
+}
+
+#[allow(dead_code)]
+pub fn to_ref_vec<'a, T>(vec: &'a Vec<T>) -> Vec<&'a T> {
+    vec.iter().collect()
+}
+
+#[allow(dead_code)]
+pub fn from_ref_vec<'a, T>(vec: Vec<&'a T>) -> Vec<T> where T: Copy {
+    vec.iter().map(|elem| **elem).collect()
 }

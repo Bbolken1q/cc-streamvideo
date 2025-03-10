@@ -5,7 +5,6 @@ use crate::qpixel::qpixel::Qpixel;
 
 #[path = "sorting.rs"]
 mod sorting;
-use sorting::hue;
 
 #[allow(dead_code)]
 fn find_distance(point_a: &[u8; 3], point_b: &[u8; 3]) -> u16 {

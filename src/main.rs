@@ -5,16 +5,25 @@ use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use std::{env, thread};
 use std::collections::VecDeque;
+use itertools::Itertools;
 
 #[path ="./video/playlist.rs"]
 mod playlist;
-use playlist::return_playlist;
+use playlist::{return_playlist, get_file};
+
+#[path ="./video/video.rs"]
+mod video;
+use video::get_frames;
 
 #[path ="./posterization/sorting.rs"]
 mod sorting;
 pub mod pixelgroup;
 #[allow(unused_imports)]
 use sorting::{lightness_linear, lightness_unweighted, lightness, hue, hilbert_wrapper, hilbert_lookup, fill_lookup};
+
+#[path ="./sort.rs"]
+mod sort;
+use sort::merge_sort;
 
 mod frame;
 use frame::frame::Frame;
@@ -26,6 +35,13 @@ mod p_image;
 static mut HILBERT_VALUES: Vec<Vec<Vec<u32>>> = Vec::new();
 
 static mut FRAMES: VecDeque<Frame> = VecDeque::new();
+static mut IS_EOF: bool = false;
+
+fn get_string_index(value: &&str) -> f32 {
+    println!("{}", value.split("-").collect::<Vec<&str>>()[value.split("-").collect::<Vec<&str>>().len()-4]);
+    // println!("{}", value.filename);
+    value.split("-").collect::<Vec<&str>>()[value.split("-").collect::<Vec<&str>>().len()-4].parse().expect("Error parsing to float")
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,16 +61,42 @@ async fn main() -> Result<()> {
     println!("WebSocket server started on ws://{}", addr);
 
     fill_lookup(); // create the lookup table 
-    // thread::spawn(move || async move {
-    //     while let Ok((stream, _)) = listener.accept().await {
-    //         tokio::spawn(handle_connection(stream));
-    //     }
-    // });
     
-
     let client = reqwest::Client::new();
+    let mut frame_index: usize = 0;
+    let playlist = return_playlist(&client, base_url).await;
 
-    let _playlist = return_playlist(client, base_url).await;
+    // let playlist: Vec<Link>  = playlist.iter().map(|link| Link { full: link, filename: link.split("/").collect::<Vec<&str>>()[link.split("/").collect::<Vec<&str>>().len() - 1]}).collect();
+
+    // let url_length = playlist[0].split("/").collect::<Vec<&str>>().len();
+    let links: Vec<&str> = playlist.iter().map(|s| s.as_str()).collect();
+    
+    println!("{}", links[0]);
+
+    merge_sort(&links, &get_string_index);
+
+    let links = links.iter().unique();
+    let mut frames: String = "".to_string();
+
+    thread::spawn(move || async move {
+        while let Ok((stream, _)) = listener.accept().await {
+            tokio::spawn(handle_connection(stream));
+        }
+    });
+
+    for link in links {
+        let file = get_file(&client, &link).await;
+        let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap();
+        for (_, element) in images {
+            frames = frames + "=" + &element;
+        }
+        #[allow(static_mut_refs)]
+        unsafe { FRAMES.push_back(Frame::new(&frames)); }
+
+        frames = "".to_string();
+    }
+
+    unsafe { IS_EOF = true; }
 
     // let _ = get_frames("./input/test.ts");
 
@@ -68,17 +110,22 @@ async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
     ws_stream.send(Message::Text(24.to_string())).await?;
 
     #[allow(static_mut_refs)]
-    ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap().get_video() })).await?;
+    while unsafe { FRAMES.len() > 0 || !IS_EOF } {
+        if unsafe { FRAMES.len() > 0 } { 
+            ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap().get_video() })).await?;
+        }
+    }
+
     ws_stream.send(Message::Text("eof".to_string())).await?;
 
-    while let Some(msg) = ws_stream.next().await {
+    /* while let Some(msg) = ws_stream.next().await {
         let msg = msg?;
         if msg.is_text() {
             let received_text = msg.to_text()?;
             println!("Received message: {}", received_text);
             ws_stream.send(Message::Text(received_text.to_string())).await?;
         }
-    }
+    } */
 
     Ok(())
 }
