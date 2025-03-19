@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.12", features = ["full"] }
 tokio-stream = "0.1"
-tokio-tungstenite = "0.23.1"
 anyhow = "1.0"
 futures-util = "0.3"
 image = "0.25.5"
@@ -23,6 +22,8 @@ m3u8-rs = "6.0.0"
 nom = "8.0.0"
 reqwest = "0.12.12"
 itertools = "0.14.0"
+futures = "0.3.31"
+tokio-tungstenite = "0.26.2"
 
 [profile.release]
 lto = true

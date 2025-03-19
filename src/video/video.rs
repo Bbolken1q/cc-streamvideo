@@ -22,7 +22,7 @@ impl AVIOBuffer<'_> {
         let slice;
 
         if buf != ptr::null_mut() {
-            println!("{:?}", buf);
+            // println!("{:?}", buf);
             slice = std::slice::from_raw_parts_mut(buf, buf_size as usize);
         }
         else {
@@ -86,11 +86,11 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
         
         let frame: Frame = Frame::new(&ostring);
 
-        #[allow(static_mut_refs)]
-        unsafe { FRAMES.push_back(frame) };
+        // #[allow(static_mut_refs)]
+        // unsafe { FRAMES.push_back(frame) };
         
         *frame_index += 1;
-        println!("{}", frame_index)
+        // println!("{}", frame_index)
         
     }
     Ok((output_image, ostring))

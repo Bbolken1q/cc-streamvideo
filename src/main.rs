@@ -1,10 +1,11 @@
 use tokio::net::TcpListener;
-use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::tungstenite::Utf8Bytes;
+use tokio_tungstenite::{tungstenite::protocol::Message, accept_async};
 use anyhow::Result;
 use futures_util::SinkExt;
-use std::{env, thread};
+use std::env;
 use std::collections::VecDeque;
+use std::time::Duration;
 use itertools::Itertools;
 
 #[path ="./video/playlist.rs"]
@@ -38,7 +39,7 @@ static mut FRAMES: VecDeque<Frame> = VecDeque::new();
 static mut IS_EOF: bool = false;
 
 fn get_string_index(value: &&str) -> f32 {
-    println!("{}", value.split("-").collect::<Vec<&str>>()[value.split("-").collect::<Vec<&str>>().len()-4]);
+    // println!("{}", value.split("-").collect::<Vec<&str>>()[value.split("-").collect::<Vec<&str>>().len()-4]);
     // println!("{}", value.filename);
     value.split("-").collect::<Vec<&str>>()[value.split("-").collect::<Vec<&str>>().len()-4].parse().expect("Error parsing to float")
 }
@@ -70,26 +71,23 @@ async fn main() -> Result<()> {
 
     // let url_length = playlist[0].split("/").collect::<Vec<&str>>().len();
     let links: Vec<&str> = playlist.iter().map(|s| s.as_str()).collect();
-    
-    println!("{}", links[0]);
 
     merge_sort(&links, &get_string_index);
 
     let links = links.iter().unique();
     let mut frames: String = "".to_string();
 
-    thread::spawn(move || async move {
-        while let Ok((stream, _)) = listener.accept().await {
-            tokio::spawn(handle_connection(stream));
-        }
-    });
+    tokio::spawn(async { start_connection(listener).await });
 
     for link in links {
         let file = get_file(&client, &link).await;
         let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap();
+        println!("length: {}", images.len());
         for (_, element) in images {
             frames = frames + "=" + &element;
         }
+
+        // println!("test");
         #[allow(static_mut_refs)]
         unsafe { FRAMES.push_back(Frame::new(&frames)); }
 
@@ -107,16 +105,17 @@ async fn main() -> Result<()> {
 async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
     let mut ws_stream = accept_async(stream).await?;
     println!("CC client connected");
-    ws_stream.send(Message::Text(24.to_string())).await?;
+    ws_stream.send(Message::Text(Utf8Bytes::from_static("24"))).await?;
 
     #[allow(static_mut_refs)]
     while unsafe { FRAMES.len() > 0 || !IS_EOF } {
         if unsafe { FRAMES.len() > 0 } { 
             ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap().get_video() })).await?;
+            // tokio::time::sleep(Duration::from_millis(1000/24)).await;
         }
     }
 
-    ws_stream.send(Message::Text("eof".to_string())).await?;
+    ws_stream.send(Message::Text(Utf8Bytes::from_static("eof"))).await?;
 
     /* while let Some(msg) = ws_stream.next().await {
         let msg = msg?;
@@ -129,3 +128,16 @@ async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
 
     Ok(())
 }
+
+async fn start_connection(listener: TcpListener) {
+    while let Ok((stream, _)) = listener.accept().await {
+        tokio::spawn(handle_connection(stream));
+    }
+}   
+
+
+// async fn spawn_ws(listener: TcpListener) -> impl Future<Output = ()> {
+//     while let Ok((stream, _)) = listener.accept().await {
+//         tokio::spawn(handle_connection(stream));
+//     }
+// }
