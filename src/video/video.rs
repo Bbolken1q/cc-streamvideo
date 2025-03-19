@@ -55,7 +55,7 @@ fn create_input(file: &[u8]) -> Result<Input, Error> {
 
         // println!("{:?}", *avio_context);
 
-        match avformat_open_input(&mut context, CString::from_str("").unwrap().as_ptr(), ptr::null_mut(), ptr::null_mut()) {
+        match avformat_open_input(&mut context, CString::new("").unwrap().as_ptr(), ptr::null_mut(), ptr::null_mut()) {
             0 => match avformat_find_stream_info(context, ptr::null_mut()) {
                 r if r >= 0 => Ok(Input::wrap(context)),
                 e => {
