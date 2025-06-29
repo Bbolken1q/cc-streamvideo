@@ -8,6 +8,9 @@ use std::collections::VecDeque;
 use std::time::Duration;
 use itertools::Itertools;
 
+use std::fs::File;
+use std::io::prelude::*;
+
 #[path ="./video/playlist.rs"]
 mod playlist;
 use playlist::{return_playlist, get_file};
@@ -48,12 +51,22 @@ fn get_string_index(value: &&str) -> f32 {
 async fn main() -> Result<()> {
     ffmpeg_next::init().unwrap();
 
+    let file_type: bool; // check if the input is a file or a link
+
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {
-        println!("You have not passed an url");
+        println!("You have not passed an url or a filename");
         std::process::exit(0);
     }
-    let base_url: &str = &args[1]; //enable debug
+    match &args[1].as_str() {
+        &"-l"|&"--link" => {file_type = false},
+        &"-f"|&"--file" => {file_type = true},
+        _ => {
+            println!("You have passed an unknown argument: {}", &args[1]);
+            std::process::exit(0);
+        } 
+    }
+    let base_filename: &str = &args[2]; 
     // println!("playing video from {}", base_url);
 
     let addr = "127.0.0.1:3000".to_string();
@@ -62,39 +75,57 @@ async fn main() -> Result<()> {
     println!("WebSocket server started on ws://{}", addr);
 
     fill_lookup(); // create the lookup table 
-    
-    let client = reqwest::Client::new();
     let mut frame_index: usize = 0;
-    let playlist = return_playlist(&client, base_url).await;
-
-    // let playlist: Vec<Link>  = playlist.iter().map(|link| Link { full: link, filename: link.split("/").collect::<Vec<&str>>()[link.split("/").collect::<Vec<&str>>().len() - 1]}).collect();
-
-    // let url_length = playlist[0].split("/").collect::<Vec<&str>>().len();
-    let links: Vec<&str> = playlist.iter().map(|s| s.as_str()).collect();
-
-    merge_sort(&links, &get_string_index);
-
-    let links = links.iter().unique();
     let mut frames: String = "".to_string();
+    
+    if(!file_type) {
+        let client = reqwest::Client::new();
+        let playlist = return_playlist(&client, base_filename).await;
 
-    tokio::spawn(async { start_connection(listener).await });
+        let links: Vec<&str> = playlist.iter().map(|s| s.as_str()).collect();
 
-    for link in links {
-        let file = get_file(&client, &link).await;
-        let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap();
-        println!("length: {}", images.len());
+        merge_sort(&links, &get_string_index);
+
+        let links = links.iter().unique();
+        
+        tokio::spawn(async { start_connection(listener).await });
+
+
+        for link in links {
+            let file = get_file(&client, &link).await;
+            let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap();
+            println!("length: {}", images.len());
+            for (_, element) in images {
+                frames = frames + "=" + &element;
+            }
+
+            // println!("test");
+            #[allow(static_mut_refs)]
+            unsafe { FRAMES.push_back(Frame::new(&frames)); }
+
+            frames = "".to_string();
+        }
+    } else {
+        let file = std::fs::read(base_filename).expect("Failed to read the file");
+        let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap(); // not good, needs a fucking terabyte of ram. Ideally would like to split the file into chunks and process them one by one
         for (_, element) in images {
             frames = frames + "=" + &element;
         }
 
-        // println!("test");
         #[allow(static_mut_refs)]
-        unsafe { FRAMES.push_back(Frame::new(&frames)); }
+            unsafe { FRAMES.push_back(Frame::new(&frames)); }
 
         frames = "".to_string();
     }
-
     unsafe { IS_EOF = true; }
+
+    let mut file = File::create("./output/output.txt")?;
+
+    for frame in unsafe { FRAMES.iter() } {
+        file.write_all((frame.get_video() + "\n").as_bytes())?;
+    } 
+
+    println!("finished");
 
     // let _ = get_frames("./input/test.ts");
 
