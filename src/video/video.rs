@@ -1,5 +1,5 @@
 extern crate ffmpeg_next as ffmpeg;
-use std::{ffi::CString, io::{Cursor, Read}, ptr, result::Result::Ok, str::FromStr};
+use std::{ffi::CString, i32, io::{Cursor, Read}, ptr, result::Result::Ok, str::FromStr};
 use ffmpeg::{format::{Pixel, context::Input}, media::Type, software::scaling::{context::Context, flag::Flags}, util::{frame::video::Video, error::Error}, ffi::*};
 use image::{DynamicImage, RgbImage};
 
@@ -40,7 +40,7 @@ impl AVIOBuffer<'_> {
 #[allow(dead_code)]
 fn create_input(file: &[u8]) -> Result<Input, Error> {
     unsafe {
-        let buf_sz: i32 = 10 * 1024 * 1024;
+        let buf_sz: i32 = 1024*1024*10;
         let buf = av_malloc(buf_sz as usize) as *mut u8;
 
         let mut avio_buffer_struct = AVIOBuffer {
@@ -82,9 +82,12 @@ fn receive_and_process_decoded_frames(decoder: &mut ffmpeg::decoder::Video, fram
         let image = DynamicImage::ImageRgb8(RgbImage::from_raw(rgb_frame.width(), rgb_frame.height(), rgb_frame.data(0).to_vec()).ok_or("Failed to create image").expect("Failed to create image"));
         // let _ = image.save("./frame".to_owned() + &frame_index.to_string().to_owned() + ".png");
         (output_image, ostring) = p_image::posterize_image(&image, 15);
-        output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
+        println!("posterized image");
+
+
+        // output_image.save("./output/posterized_image".to_string()+&frame_index.to_string()+".png").expect("Failed to save the image");
         
-        let frame: Frame = Frame::new(&ostring);
+        // let frame: Frame = Frame::new(&ostring);
 
         // #[allow(static_mut_refs)]
         // unsafe { FRAMES.push_back(frame) };

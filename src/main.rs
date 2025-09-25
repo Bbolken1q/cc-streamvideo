@@ -1,3 +1,4 @@
+use futures::TryStreamExt;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 use tokio_tungstenite::{tungstenite::protocol::Message, accept_async};
@@ -78,6 +79,11 @@ async fn main() -> Result<()> {
     let mut frame_index: usize = 0;
     let mut frames: String = "".to_string();
     
+    let mut handles = vec![];
+
+    handles.push(tokio::spawn(async { start_connection(listener).await }));
+
+
     if(!file_type) {
         let client = reqwest::Client::new();
         let playlist = return_playlist(&client, base_filename).await;
@@ -88,7 +94,7 @@ async fn main() -> Result<()> {
 
         let links = links.iter().unique();
         
-        tokio::spawn(async { start_connection(listener).await });
+        // tokio::spawn(async { start_connection(listener).await });
 
 
         for link in links {
@@ -102,6 +108,7 @@ async fn main() -> Result<()> {
             // println!("test");
             #[allow(static_mut_refs)]
             unsafe { FRAMES.push_back(Frame::new(&frames)); }
+            
 
             frames = "".to_string();
         }
@@ -109,23 +116,32 @@ async fn main() -> Result<()> {
         let file = std::fs::read(base_filename).expect("Failed to read the file");
         let images = get_frames(&(file.as_slice()), &mut frame_index).unwrap(); // not good, needs a fucking terabyte of ram. Ideally would like to split the file into chunks and process them one by one
         for (_, element) in images {
-            frames = frames + "=" + &element;
+            // frames = frames + "=" + &element;
+
+            #[allow(static_mut_refs)]
+        unsafe { FRAMES.push_back(Frame::new(&element)); }
         }
 
-        #[allow(static_mut_refs)]
-            unsafe { FRAMES.push_back(Frame::new(&frames)); }
+        
+
+        println!("pushed frames");
+
+        println!("{}", unsafe { FRAMES.len()});
 
         frames = "".to_string();
     }
+
     unsafe { IS_EOF = true; }
 
-    let mut file = File::create("./output/output.txt")?;
+    futures::future::join_all(handles).await;
+    
+    // let mut file = File::create("./output/output.txt")?;
 
-    for frame in unsafe { FRAMES.iter() } {
-        file.write_all((frame.get_video() + "\n").as_bytes())?;
-    } 
+    // for frame in unsafe { FRAMES.iter() } {
+    //     file.write_all((frame.get_video() + "\n").as_bytes())?;
+    // } 
 
-    println!("finished");
+    // println!("finished");
 
     // let _ = get_frames("./input/test.ts");
 
@@ -137,25 +153,40 @@ async fn handle_connection(stream: tokio::net::TcpStream) -> Result<()> {
     let mut ws_stream = accept_async(stream).await?;
     println!("CC client connected");
     ws_stream.send(Message::Text(Utf8Bytes::from_static("24"))).await?;
+    println!("sent fps");
+
+    // let test: String = "test message".to_string();
+    // ws_stream.send(Message::Text(Utf8Bytes::from(&test))).await?;<s
 
     #[allow(static_mut_refs)]
     while unsafe { FRAMES.len() > 0 || !IS_EOF } {
-        if unsafe { FRAMES.len() > 0 } { 
-            ws_stream.send(Message::text(unsafe { FRAMES.pop_front().unwrap().get_video() })).await?;
+        // println!("is this even running");
+        tokio::time::sleep(Duration::from_millis(1000/10)).await; // what the actual fuck 
+        while unsafe { FRAMES.len() > 0 } { 
+            // println!("length not 0");
+            let message = unsafe { FRAMES.pop_front().unwrap().get_video() };
+            // println!("{}", message);
+            // println!("sending message");
+            if(message.len() > 0) {
+                ws_stream.send(Message::Text(Utf8Bytes::from(&message))).await?;
+            }
+
             // tokio::time::sleep(Duration::from_millis(1000/24)).await;
         }
     }
 
+    println!("eof");
+
     ws_stream.send(Message::Text(Utf8Bytes::from_static("eof"))).await?;
 
-    /* while let Some(msg) = ws_stream.next().await {
-        let msg = msg?;
+     while let Some(msg) = ws_stream.try_next().await.unwrap() {
+        let msg = msg;
         if msg.is_text() {
             let received_text = msg.to_text()?;
             println!("Received message: {}", received_text);
-            ws_stream.send(Message::Text(received_text.to_string())).await?;
+            ws_stream.send(Message::Text(Utf8Bytes::from(received_text.to_string()))).await?;
         }
-    } */
+    } 
 
     Ok(())
 }

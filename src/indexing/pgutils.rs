@@ -14,39 +14,58 @@ mod find_distance;
 use find_distance::get_position;
 
 static CHARSET: LazyLock<HashMap<u8, &str>> = std::sync::LazyLock::new(||HashMap::from([
-    (0b00000000 as u8, "0x80"),
-    (0b00100000 as u8, "0x81"),
-    (0b00010000 as u8, "0x82"),
-    (0b00110000 as u8, "0x83"),
-    (0b00001000 as u8, "0x84"),
-    (0b00101000 as u8, "0x85"),
-    (0b00011000 as u8, "0x86"),
-    (0b00111000 as u8, "0x87"),
-    (0b00000100 as u8, "0x88"),
-    (0b00100100 as u8, "0x89"),
-    (0b00010100 as u8, "0x8a"),
-    (0b00110100 as u8, "0x8b"),
-    (0b00001100 as u8, "0x8c"),
-    (0b00101100 as u8, "0x8d"),
-    (0b00011100 as u8, "0x8e"),
-    (0b00111100 as u8, "0x8f"),
-    (0b00000010 as u8, "0x90"),
-    (0b00100010 as u8, "0x91"),
-    (0b00010010 as u8, "0x92"),
-    (0b00110010 as u8, "0x93"),
-    (0b00001010 as u8, "0x94"),
-    (0b00101010 as u8, "0x95"),
-    (0b00011010 as u8, "0x96"),
-    (0b00111010 as u8, "0x97"),
-    (0b00000110 as u8, "0x98"),
-    (0b00100110 as u8, "0x99"),
-    (0b00010110 as u8, "0x9a"),
-    (0b00110110 as u8, "0x9b"),
-    (0b00001110 as u8, "0x9c"),
-    (0b00101110 as u8, "0x9d"),
-    (0b00011110 as u8, "0x9e"),
-    (0b00111110 as u8, "0x9f"),
+    (0b00000000 as u8, ""),
+    (0b00100000 as u8, ""),
+    (0b00010000 as u8, ""),
+    (0b00110000 as u8, ""),
+    (0b00001000 as u8, ""),
+    (0b00101000 as u8, ""),
+    (0b00011000 as u8, ""),
+    (0b00111000 as u8, ""),
+    (0b00000100 as u8, ""),
+    (0b00100100 as u8, ""),
+    (0b00010100 as u8, ""),
+    (0b00110100 as u8, ""),
+    (0b00001100 as u8, ""),
+    (0b00101100 as u8, ""),
+    (0b00011100 as u8, ""),
+    (0b00111100 as u8, ""),
+    (0b00000010 as u8, ""),
+    (0b00100010 as u8, ""),
+    (0b00010010 as u8, ""),
+    (0b00110010 as u8, ""),
+    (0b00001010 as u8, ""),
+    (0b00101010 as u8, ""),
+    (0b00011010 as u8, ""),
+    (0b00111010 as u8, ""),
+    (0b00000110 as u8, ""),
+    (0b00100110 as u8, ""),
+    (0b00010110 as u8, ""),
+    (0b00110110 as u8, ""),
+    (0b00001110 as u8, ""),
+    (0b00101110 as u8, ""),
+    (0b00011110 as u8, ""),
+    (0b00111110 as u8, ""),
     
+]));
+
+static COLORS: LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(||HashMap::from([
+    ("0", "0"),
+    ("1", "1"),
+    ("2", "2"),
+    ("3", "3"),
+    ("4", "4"),
+    ("5", "5"),
+    ("6", "6"),
+    ("7", "7"),
+    ("8", "8"),
+    ("9", "9"),
+    ("10", "a"),
+    ("11", "b"),
+    ("12", "c"),
+    ("13", "d"),
+    ("14", "e"),
+    ("15", "f")
 ]));
 
 fn rgb_to_u8(pixel: Rgb) -> (u8, u8, u8) {
@@ -61,14 +80,14 @@ fn remove_first(value: &str) -> &str {
 
 pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelGroup>, String) {
     let mut groups: Vec<PixelGroup> = Vec::new();
-    let mut output_string: String = "1=".to_string();
+    let mut output_string: String = "\n".to_string();
     for color in &centroids {
         output_string += "0x";
         output_string += remove_first(&col_rgb::from(color.color.red, color.color.green, color.color.blue).to_css_hex_string());
-        output_string += "|";
+        output_string += ";";
     }
     
-    output_string += "=";
+    output_string += "|";
     for i in 0..(pixels.len()/6) {
         let mut  group: PixelGroup = PixelGroup::new([
             pixels[((i as f32/160.0).floor() * 960.0) as usize + 000 + (i*2)%320 + 0],
@@ -86,14 +105,37 @@ pub fn get_pixel_groups(pixels: Vec<Rgb>, centroids: Vec<Qpixel>) -> (Vec<PixelG
     }
 
     for x in 0..60 {
-        output_string += "";
+        let mut output_character = "".to_string();
+        let mut output_foreground_color = "".to_string();
+        let mut output_background_color = "".to_string();
+
+        output_string += "\n";
+        
         for j in 0..160 {
-            output_string += &("-".to_owned() + &x.to_string() + "," + &j.to_string() + "|" + groups[x*160 + j].character.as_str() + "," + groups[x*160+j].c1.to_string().as_str() + "," + groups[x*160+j].c2.to_string().as_str());
+            output_character += groups[x*160 + j].character.as_str();
+            output_foreground_color += num_to_col(groups[x*160+j].c1.to_string().as_str());
+            output_background_color += num_to_col(groups[x*160+j].c2.to_string().as_str());
+            // output_string += &("|".to_owned() + "," +  + "," + groups[x*160+j].c2.to_string().as_str());
         }
+        output_string += &(output_character.to_string() + "," + &output_foreground_color.to_string() + "," + &output_background_color.to_string() + ";")
     }
 
     return (groups, output_string);
 }
+
+fn num_to_col(str: &str) -> &str {
+    match COLORS.get(str) {
+        Some(char) => {
+            return char;
+            // println!("{}, {:08b}", char, group.structure);
+        }
+        None => {
+                println!("Not found character");
+                return "0"
+        }
+    }
+}
+
 
 fn posterize_group(group: &mut PixelGroup, centroids: &Vec<Qpixel>) {
     let pixels = group.pixels.clone();

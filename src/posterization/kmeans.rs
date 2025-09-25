@@ -22,7 +22,8 @@ use sort::{merge_sort, get_hue, to_ref_vec, from_ref_vec};
 
 pub fn posterize_kmeans(image: &DynamicImage, rgb_image: RgbImage, k: usize) -> (Vec<Rgb>, Vec<Qpixel>) {  //pixels: &Vec<Rgb>
     /*
-        Base implementation, ~230ms for clustering and posterization 
+        Base implementation (kmeans), ~230ms for clustering and posterization 
+        Hilbert curve is much faster
     */
 
     let img = image;
