@@ -1,4 +1,5 @@
-local col = { colors.white,
+local col = { 
+colors.white,
 colors.orange,
 colors.magenta,
 colors.lightBlue,
@@ -15,6 +16,20 @@ colors.green,
 colors.red,
 colors.black
 }
+
+local monitor = peripheral.find("monitor")
+
+local function separateByCharacter(line, sep) 
+    if sep == nil then
+        sep = "%s"
+    end
+    local t = {}
+    
+    for str in string.gmatch(line, "([^"..sep.."]+)") do
+        table.insert(t, str)
+    end
+    return t
+end
 
 local baseColors = {
     0xF0F0F0,
@@ -35,45 +50,25 @@ local baseColors = {
     0x111111
 }
 
-local monitor = peripheral.find("monitor")
-
-monitor.setTextScale(0.5)
-term.clear()
--- term.setCursorPos(1, 1)
-
 local function changeColors(_colors)
-    for i=1, 15 do
+    for i=1, 16 do
         if _colors[i] ~= nil then
-            monitor.setPaletteColor(col[i], tonumber(_colors[i]))
+            -- print(string.sub(_colors[i], 1, 8))
+            -- print(#_colors)
+            monitor.setPaletteColor(col[i], tonumber(_colors[i])) -- tonumber()
         end
     end   
 end
 
-local newColor = {
-    0xe5e5e5,
-    0xd8d8d8,
-    0xcccccc,
-    0xbfbfbf,
-    0xb2b2b2,
-    0xa6a6a6,
-    0x999999,
-    0x8c8c8c,
-    0x808080,
-    0x737373,
-    0x666666,
-    0x595959,
-    0x4c4c4c,
-    0x404040,
-    0x333333,
-    0x262626
-    }
-
-
--- changeColors(newColor)
-
+local function setColors(string)
+    -- print("changed colors")
+    local colors = separateByCharacter(string, ";")
+    -- print(colors[1])
+    changeColors(colors)
+end
 
 FrameBuffer = {}
-              --this is a bad implementation but it should do (3 hours of footage @ 60fps is only ~650,000 frames, @ 128bytes/frame its only ~8MB of ram) // this calculation has proven to be wildly incorrect, without any compression it's 154kb
+              --this is a bad implementation but it should do (3 hours of footage @ 60fps is only ~650,000 frames, @ 128bytes/frame its only ~8MB of ram) // this calculation has proven to be wildly incorrect, without any compression it's 154kb -- update: 37kb
 
 function FrameBuffer.new()
     return {first = 0, last = -1}
@@ -96,134 +91,152 @@ function FrameBuffer.pop()
     return value
 end
 
-
-local function separateByCharacter(line, sep) 
-    if sep == nil then
-        sep = "%s"
-    end
-    local t = {}
-    for str in string.gmatch(line, "([^"..sep.."]+)") do
-        table.insert(t, str)
-    end
-    return t
+function FrameBuffer.isEmpty()
+    local first = FrameBuffer.first
+    if first > FrameBuffer.last then return true else return false end
 end
 
-local function setColors(string)
-    local colors = separateByCharacter(string, "|")
-    changeColors(colors)
+monitor.setTextScale(0.5)
+term.clear()
+-- term.setCursorPos(1, 1)
+
+function parseFrames(str)
+    local frames = separateByCharacter(str, "=")
+    for i=1,#frames do
+        FrameBuffer.push(frames[i])
+    end
 end
 
-local function drawPixel(char, pos_x, pos_y, color_foreground, color_background)
-    if pos_x<0 or pos_x>160 then
-        -- return
-        error("unable to draw pixel: oob on x axis - cannot draw at *" .. pos_x .. "*, " ..pos_y)
-    end
-
+function drawRow(str, color_foreground, color_background, pos_y)
     if pos_y<0 or pos_y>60 then
         -- return
         error("unable to draw pixel: oob on y axis - cannot draw at " .. pos_x .. ", *" ..pos_y .. "*")
     end
 
-    monitor.setCursorPos(pos_x+2, pos_y+3)
-    monitor.blit(string.char(char), colors.toBlit(col[color_foreground]), colors.toBlit(col[color_background]))
-    -- paintutils.drawPixel(pos_x+2, pos_y+3, col[_colors])
+    monitor.setCursorPos(3, pos_y+3)
+    
+    -- print(string.len(str)..", "..string.len(color_foreground))
+    monitor.blit(str, color_foreground, color_background) 
 end
 
-local function displayLine(line, pos_y) 
-    local t = separateByCharacter(line, "|")                -- separate different colored chunks
-    local iter = 1
-    for i=1, #t do                                          -- for the amount of chunks
-        local str = t[i]
-        local compressed = separateByCharacter(str, "*")    -- get amount of letters
-            for draw=0, tonumber(compressed[1]) do          
-                local params = separateByCharacter(compressed[2], ",")
-                drawPixel(params[1], iter, pos_y, tonumber(params[2]), tonumber(params[3]))
-                iter = iter + 1
-            end
-    end
+local function redrawScreen(str)
+
+    local strings = separateByCharacter(str, ";")
+
+    local startTime = os.epoch("utc")
+
+        for y=1,60 do
+            components = separateByCharacter(strings[y], ",")
+            drawRow(string.sub(components[1], 1, 160), components[2], components[3], y)
+        end
+
+    local endTime = os.epoch("utc")
+
+    print("drawn in " .. endTime-startTime .. "ms")
 end
 
-local function displayLines(string)
-    local t = separateByCharacter(string, "-")              -- separate lines from one another
-    local iter = 1
-    for i=1, #t do                                          -- set up line iterator(keep track of lines)
-        local params = separateByCharacter(t[i], "|")
-        local pos = separateByCharacter(params[1], ",")
-        local character = separateByCharacter(params[2], ",")
-
-        drawPixel(character[1], tonumber(pos[2]), tonumber(pos[1]), tonumber(character[2]), tonumber(character[3]))
-    end
-end
-
-local function setFrame(string)
-    local framedata = separateByCharacter(string, "=") 
-    -- print(framedata[1])                             -- frame number
-    setColors(framedata[2])                         -- color scheme
-    displayLines(framedata[3])                      -- actual frame data
-end
-
-local ws
+local is_eof = true
 
 local function connectToWS()
     ws = assert(http.websocket("127.0.0.1:3000"))
     Frametime = ws.receive()
     print("running animation @ " .. Frametime .. "fps")
-    Framecount = ws.receive()
+    -- Framecount = ws.receive()
     print(Framecount)
     Framecount = tonumber(Framecount)
     print(Framecount)
     os.queueEvent("player_start")
     while true do
+        -- print("loading frames")
         local response = ws.receive()
         if response == "eof" then
-            ws.close()
+            -- ws.close()
+            is_eof = false
             print("websocket closed")
             break
         else
-            local frames = separateByCharacter(response, "#")
-            print("Pushing frame into framebuffer")
-            for i=1, #frames do
-                FrameBuffer.push(frames[i])
-            end
+            -- local frames = separateByCharacter(response, "#") 
+            -- print("Pushing frame into framebuffer")
+            -- print(response)
+            parseFrames(response)
             
             
             -- print(FrameBuffer.pop())
             -- setFrame(FrameBuffer.pop())
         end
+        -- os.startTimer(0)
+        -- os.pullEvent("timer")
         coroutine.yield()
     end
 end
 
-local function pushFrame()
-    os.pullEvent("player_start") --wait for the player to start 
-    local time = os.epoch("utc")
-    local framec = 0
-    while true do
-        print("Started mainloop --------------------------------------")
-        if not (FrameBuffer.first > FrameBuffer.last) and Framecount >= framec then 
-            while (not (FrameBuffer.first > FrameBuffer.last)) do
-                while(time+(1000/Frametime) < os.epoch("utc")) do
-                    print("Frametime: "..os.epoch("utc")-time)
-                    setFrame(FrameBuffer.pop())
-                    time = os.epoch("utc")
-                    framec = framec + 1;
+-- start of test
+
+local Frametime = 24
+
+
+function pushFrame()
+    os.pullEvent("player_start")
+
+    local fps = 24
+    local frameDuration = 1000 / fps -- ~41.666ms
+    local nextFrameTime = os.epoch("utc")
+    
+    
+    framec = 0
+    
+    print("Started mainloop --------------------------------------")
+    
+    while is_eof do
+        while not FrameBuffer.isEmpty() do
+            local now = os.epoch("utc")
+            
+            if now >= nextFrameTime then
+                print("drawing frame")
+                -- Draw frame
+                local frameComponents = separateByCharacter(FrameBuffer.pop(), "|")
+                setColors(frameComponents[1])
+                redrawScreen(frameComponents[2])
+                
+                local frameLength = os.epoch("utc") - now
+                if frameLength > frameDuration then
+                    print("WARN: DRAWING FRAME TOOK TOO LONG")
                 end
-                coroutine.yield()
+                
+                print("Frametime: " .. frameLength .. "ms")
+                
+                framec = framec + 1
+                nextFrameTime = nextFrameTime + frameDuration
+                
+                if os.epoch("utc") > nextFrameTime + frameDuration then
+                    nextFrameTime = os.epoch("utc") + frameDuration
+                end
+            else
+                local waitTime = nextFrameTime - os.epoch("utc")
+                
+                if waitTime > 20 then
+                    os.startTimer(0)
+                    os.pullEvent("timer")
+                end
+                
+                while os.epoch("utc") < nextFrameTime do end
             end
-        else
-            -- coroutine.yield()
-            break
         end
+        os.startTimer(0)
+        os.pullEvent("timer")
     end
-    -- print(FrameBuffer.pop())
-    print("No more frames to display")
-    exit()
 
+
+    ws.close()
+    print("finished video")
 end
+-- print(FrameBuffer.pop())
 
-term.clear()
-term.setCursorPos(1,1)
+local startTimeMeasure = os.epoch("utc")
+
 parallel.waitForAll(connectToWS, pushFrame)
--- connectToWS()
 
-monitor.setBackgroundColor(colors.black)
+local endTimeMeasure = os.epoch("utc")
+print("finished in " .. endTimeMeasure-startTimeMeasure .. "ms")
+
+-- end of test
